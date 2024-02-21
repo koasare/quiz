@@ -6,16 +6,23 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 )
 
 // Type Definitions
+
 type Problems struct {
+	/* Problems Struct to Sort CSV file in question and answer */
 	question string
 	answer   string
 }
 
 // Functions
+
 func parseLines(records [][]string) []Problems {
+	/* func parseLines takes string array from csv file and parses
+	each line to create a seperation between questions and answers
+	*/
 	result := make([]Problems, len(records))
 	for i, record := range records {
 		result[i] = Problems{
@@ -26,12 +33,15 @@ func parseLines(records [][]string) []Problems {
 	return result
 }
 func exit(msg string) {
+	/*Exit function to condition
+	exits in the event of an error*/
 	fmt.Println(msg)
 	os.Exit(1)
 }
 
 func main() {
 	csvFileName := flag.String("csv", "problems.csv", "a csv file in the format of 'question, answer'")
+	timeLimit := flag.Int("limit", 10, "the time limit for the quiz in seconds")
 	flag.Parse()
 
 	file, err := os.Open(*csvFileName)
@@ -46,18 +56,27 @@ func main() {
 	}
 	problems := parseLines(records)
 	//fmt.Println(problems)
+	answerTimer := time.NewTimer(time.Duration(*timeLimit) * time.Second)
+
 	correct_answer := 0
 	for i, problem := range problems {
 		fmt.Printf("Problem #%d: %s =  \n", i+1, problem.question)
-		var answer string
-		fmt.Scanf("%s\n", &answer)
-		if answer == problem.answer {
-			correct_answer++
-		} else {
-			fmt.Println("Oops, wrong Answer!")
-			fmt.Println("The correct answer is:", problem.answer)
+		answerChannel := make(chan string)
+		go func() {
+			var answer string
+			fmt.Scanf("%s\n", &answer)
+			answerChannel <- answer
+		}()
+
+		select {
+		case <-answerTimer.C:
+			fmt.Printf("You scored %d out of %d questions", correct_answer, len(problems))
+			return
+		case answer := <-answerChannel:
+			if answer == problem.answer {
+				correct_answer++
+			}
 		}
 	}
 	fmt.Printf("You scored %d out of %d questions", correct_answer, len(problems))
-
 }
